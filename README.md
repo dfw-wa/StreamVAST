@@ -11,11 +11,11 @@ It is strongly recommended that users first install the tinyVAST package and its
 
 To install StreamVAST, use this code:
 ```
-remotes::install_github("Jpharris7/StreamVAST")
+remotes::install_github("dfw-wa/StreamVAST")
 ```
 If this doesn't work, consider leaving out the vignettes, as these are under development.
 ```
-remotes::install_github("Jpharris7/StreamVAST", build_vignettes = FALSE)
+remotes::install_github("dfw-wa/StreamVAST", build_vignettes = FALSE)
 ```
 ## Shape and Data Prep
 This section is demonstrates how to format and clean a set of lines, convert it into a network, root the network, remove unnecessary sections, and associate various types of data with the network. [Preparing a Stream Network](https://jpharris7.github.io/StreamVAST/articles/shape_prep.html)
