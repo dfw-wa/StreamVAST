@@ -225,7 +225,6 @@ SetTemporalFrame<-function(streamvast,startdate=NA,enddate=NA,Time="Year",
                            year.table[,c(2,4,3)])
   }else{
 
-    ############  This whole section is mostly untested  ####################
     for(i in 1:nrow(year.table)){
       tseq<-seq(from=year.table$Start[i],to=year.table$End[i],by=1)
 
@@ -302,6 +301,7 @@ SetTemporalFrame<-function(streamvast,startdate=NA,enddate=NA,Time="Year",
   time.table$Observed<-sapply(time.table$Time,FUN = function(x){return(any(x==out.data$Time))})
 
   # Now make padding data, if adding zeros to the ends of each season
+  # Need to add code to prevent duplicate entries if we have records for early season
   if(padyear){
     nreaches<-sum(streamvast$reachdata$habitat)
     reach.vec<-which(streamvast$reachdata$habitat==1)
@@ -342,6 +342,32 @@ SetTemporalFrame<-function(streamvast,startdate=NA,enddate=NA,Time="Year",
                           Lon=rep(streamvast$reachdata$CenterLon[reach.vec],nrow(time.table)),
                           Original=F)
 
+    # screen to remove duplicates
+    front.check.mat<-aggregate(list(Statday=out.data$Statday),
+                               by=list(Runyear=out.data$Runyear,Reach=out.data$Reach),FUN=min)
+    front.dups<-subset(front.check.mat,Statday<7)
+    if(nrow(front.dups)>0){
+      drops<-rep(NA,nrow(front.dups))
+      for(i in 1:nrow(front.dups)){
+        drops[i]<-which(front.data$Runyear==front.dups$Runyear[i] & front.data$Reach==front.dups$Reach[i])
+      }
+      front.data<-front.data[-drops,]
+    }
+
+    back.check.mat<-aggregate(list(Statday=out.data$Statday),
+                              by=list(Runyear=out.data$Runyear,Reach=out.data$Reach),FUN=max)
+    maxday<-as.numeric(time.table$End-time.table$Start)
+    maxday.dat<-data.frame(Runyear=time.table$Runyear,Maxday=maxday)
+
+    back.check.mat$Maxday<-maxday.dat$Maxday[match(back.check.mat$Runyear,maxday.dat$Runyear)]
+    back.dups<-subset(back.check.mat,(Maxday-Statday)<7)
+    if(nrow(back.dups)>0){
+      drops<-rep(NA,nrow(back.dups))
+      for(i in 1:nrow(back.dups)){
+        drops[i]<-which(back.data$Runyear==back.dups$Runyear[i] & back.data$Reach==back.dups$Reach[i])
+      }
+      back.data<-back.data[-drops,]
+    }
     out.data<-rbind(out.data,front.data,back.data)
   }
   # If desired, zero out nonhabitat areas
@@ -502,15 +528,15 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
 
     if(length(evalspots)>0){
       spacedata$Density[i]<-mean(evaldata[evalspots,"Density"])
-      spacedata$fit_Density[i]<-mean(evaldata[evalspots,"fit_Density"])
       sim.eval.means<-apply(matrix(evalsims2[evalspots,],ncol=ncol(evalsims2)),MARGIN = 2,FUN = mean)
+      spacedata$fit_Density[i]<-median(sim.eval.means)
       spacedata$fit_Density_lower[i]<-stats::quantile(sim.eval.means,probs=.025,na.rm=T)
       spacedata$fit_Density_upper[i]<-stats::quantile(sim.eval.means,probs=.975,na.rm=T)
     }
 
     if(length(predspots)>0){
-      spacedata$pred_Density[i]<-mean(preddata[predspots,"pred_Density"])
       sim.pred.means<-apply(matrix(predsims2[predspots,],ncol=ncol(predsims2)),MARGIN = 2,FUN = mean)
+      spacedata$pred_Density[i]<-median(sim.pred.means)
       spacedata$pred_Density_lower[i]<-stats::quantile(sim.pred.means,probs=.025,na.rm=T)
       spacedata$pred_Density_upper[i]<-stats::quantile(sim.pred.means,probs=.975,na.rm=T)
     }
@@ -534,15 +560,15 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
 
     if(length(evalspots)>0){
       timedata$Density[i]<-mean(evaldata[evalspots,"Density"])
-      timedata$fit_Density[i]<-mean(evaldata[evalspots,"fit_Density"])
       sim.eval.means<-apply(matrix(evalsims2[evalspots,],ncol=ncol(evalsims2)),MARGIN = 2,FUN = mean)
+      timedata$fit_Density[i]<-median(sim.eval.means)
       timedata$fit_Density_lower[i]<-stats::quantile(sim.eval.means,probs=.025,na.rm=T)
       timedata$fit_Density_upper[i]<-stats::quantile(sim.eval.means,probs=.975,na.rm=T)
     }
 
     if(length(predspots)>0){
-      timedata$pred_Density[i]<-mean(preddata[predspots,"pred_Density"])
       sim.pred.means<-apply(matrix(predsims2[predspots,],ncol=ncol(predsims2)),MARGIN = 2,FUN = mean)
+      timedata$pred_Density[i]<-median(sim.pred.means)
       timedata$pred_Density_lower[i]<-stats::quantile(sim.pred.means,probs=.025,na.rm=T)
       timedata$pred_Density_upper[i]<-stats::quantile(sim.pred.means,probs=.975,na.rm=T)
     }
@@ -553,10 +579,10 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
     aucdata<-data.frame(Runyear=rep(sort(unique(streamvast$timetable$Runyear)),each=nrow(streamvast$reachdata)),
                         Reach=rep(sort(unique(as.data.frame(streamvast$reachdata)[,streamvast$reachname])),
                                   times=length(unique(streamvast$timetable$Runyear))),
-                        AUC=NA,pred_AUC=NA,pred_AUC_lower=NA,pred_AUC_upper=NA,pred_AUC_SD=NA)
+                        pred_AUC=NA,pred_AUC_lower=NA,pred_AUC_upper=NA,pred_AUC_SD=NA)
 
     auctotals<-data.frame(Runyear=sort(unique(streamvast$timetable$Runyear)),
-                          AUC=NA,pred_AUC=NA,pred_AUC_lower=NA,pred_AUC_upper=NA,
+                          pred_AUC=NA,pred_AUC_lower=NA,pred_AUC_upper=NA,
                           pred_AUC_SD=NA)
 
     aucsims<-cbind(data.frame(Runyear=aucdata$Runyear,Reach=aucdata$Reach),
@@ -581,12 +607,11 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
         index<-which(aucdata$Runyear==auctotals$Runyear[y] & aucdata$Reach==yearaucdata$Reach[r])
 
         if(length(predspots2)>0){
-          aucdata$pred_AUC[index]<-MESS::auc(x=yearreachpreds$Statday,y=yearreachpreds$pred_Count)
-
           yearreachpredaucs<-apply(yearpredsims[predspots2,],MARGIN=2,
                                    FUN=function(x){return(MESS::auc(x=yearreachpreds$Statday,y=x))})
           yeartotalpredsim[r,]<-yearreachpredaucs
 
+          aucdata$pred_AUC[index]<-median(yearreachpredaucs)
           aucdata$pred_AUC_lower[index]<-stats::quantile(yearreachpredaucs,probs = .025)
           aucdata$pred_AUC_upper[index]<-stats::quantile(yearreachpredaucs,probs = .975)
           aucdata$pred_AUC_SD[index]<-sqrt(stats::var(yearreachpredaucs))
@@ -594,11 +619,9 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
           aucsims[index,3:(ncol(predsims)+2)]<-yearreachpredaucs
         }
       }
-      auctotals$AUC[y]<-sum(aucdata$AUC[aucdata$Runyear==auctotals$Runyear[y]],na.rm=T)
-      auctotals$pred_AUC[y]<-sum(aucdata$pred_AUC[aucdata$Runyear==auctotals$Runyear[y]],na.rm=T)
-
       auctotalsims[y,2:(ncol(yeartotalpredsim)+1)]<-apply(yeartotalpredsim,MARGIN = 2,FUN = sum)
 
+      auctotals$pred_AUC[y]<-median(unlist(auctotalsims[y,2:ncol(auctotalsims)]),na.rm=T)
       auctotals$pred_AUC_lower[y]<-stats::quantile(auctotalsims[y,2:ncol(auctotalsims)],probs=.025,na.rm=T)
       auctotals$pred_AUC_upper[y]<-stats::quantile(auctotalsims[y,2:ncol(auctotalsims)],probs=.975,na.rm=T)
       auctotals$pred_AUC_SD[y]<-sqrt(stats::var(unlist(auctotalsims[y,2:ncol(auctotalsims)])))

@@ -286,6 +286,8 @@ SurvivalTable<-function(model,nsims=0,extrayears,extramethod,streamvast,mult=1){
 
       if(fam=="gammasurv"){extra.table$ExpLife<-shape*extra.table$Scale}
       if(fam=="weibullsurv"){extra.table$ExpLife<-(extra.table$Scale/shape)*gamma(1/shape)}
+    }else{
+      warning("All values for extrayears already present in model.")
     }
 
     # Now need to add in sims for the extra years
@@ -325,8 +327,6 @@ SurvivalTable<-function(model,nsims=0,extrayears,extramethod,streamvast,mult=1){
     }
     surv.table<-rbind(surv.table,extra.table)
 
-  }else{
-    warning("All values for extrayears already present in model.")
   }
 
   surv.table<-surv.table[order(surv.table$Year,surv.table$Reach),]
@@ -470,7 +470,8 @@ SurvivalTable2<-function(model,newdata,extrayears,extramethod){
 #' @examples
 plotSurvivalHistogram<-function(table,year="all",reach="all",title){
 
-  if(year[1]!="all"){table<-subset(table,Year%in%year)}
+  yearname<-ifelse("Year"%in%names(table),"Year","Runyear")
+  if(year[1]!="all"){table<-table[table[,yearname]%in%year,]}
   if(reach[1]!="all"){table<-subset(table,Reach%in%reach)}
 
   outplot<-ggplot2::ggplot()+
@@ -501,6 +502,8 @@ plotSurvivalHistogram<-function(table,year="all",reach="all",title){
 plotSurvivalCurves<-function(streamvast,data,year="all",reach="all",title,mult=1){
 
   surv.table<-streamvast$survivaltable
+  yearname<-ifelse("Year"%in%names(surv.table),"Year","Runyear")
+
   if(is.null(surv.table)){stop("Must first fit a survival model and make a survival table")}
 
   gg.seg.table<-data.frame(Year=NA,Reach=NA, group=rep(1:nrow(surv.table),each=100),
@@ -510,7 +513,7 @@ plotSurvivalCurves<-function(streamvast,data,year="all",reach="all",title,mult=1
   for(i in 1:nrow(surv.table)){
     start<-1+(100*(i-1))
     end<-100*i
-    gg.seg.table$Year[start:end]<-surv.table$Year[i]
+    gg.seg.table$Year[start:end]<-surv.table[i,yearname]
     gg.seg.table$Reach[start:end]<-surv.table$Reach[i]
     if(streamvast$survfamily=="gammasurv"){
       gg.seg.table$Surv[start:end]<-1-stats::pgamma(xseq[1:100]/mult,shape=surv.table$Shape[i],
@@ -573,6 +576,7 @@ MakeEscapement<-function(streamvast,fixed.survival=NA,mult=1,years="all",reaches
   if(is.null(streamvast$escapedata)==F){warning("Overwriting previous escapement data")}
 
   survivaltable<-streamvast$survivaltable
+  yearname<-ifelse("Year"%in%names(survivaltable),"Year","Runyear")
 
   escape<-streamvast$aucdata$aucdata
   escape$pred_Redds<-NA
@@ -623,7 +627,7 @@ MakeEscapement<-function(streamvast,fixed.survival=NA,mult=1,years="all",reaches
                                        cannot compute full confidence interval")}
 
     for(i in 1:nrow(good.escape)){
-      survival.match<-which(survivaltable$Year==good.escape$Runyear[i] &
+      survival.match<-which(survivaltable[,yearname]==good.escape$Runyear[i] &
                               survivaltable[,streamvast$reachname]==good.escape[i,streamvast$reachname])
 
       good.escape$pred_Redds[i]<-good.escape$pred_AUC[i]/survivaltable$ExpLife[survival.match]
@@ -681,7 +685,7 @@ MakeEscapement<-function(streamvast,fixed.survival=NA,mult=1,years="all",reaches
     if(is.numeric(fixed.survival) & length(fixed.survival)==1){
       yearreachsurv<-fixed.survival
     }else{
-      yearsurvival<-subset(survivaltable,Year==escapetotals$Runyear[y])
+      yearsurvival<-survivaltable[survivaltable[,yearname]==escapetotals$Runyear[y],]
       if(sim.check & dim.check){
         yearreachsurv<-streamvast$sims$survivalsims[picks,3:ncol(streamvast$sims$survivalsims)]
       }else{
@@ -725,7 +729,7 @@ MakeEscapement<-function(streamvast,fixed.survival=NA,mult=1,years="all",reaches
 #' @export
 #'
 #' @examples
-plotEscapement<-function(streamvast,obs.escape,title,ribbons=NA,median=F,years="all",reaches="all"){
+plotEscapement<-function(streamvast,obs.escape,title,ribbons=NA,median=F,years="all",reaches="all",col=2){
 
   if(years[1]=="all" & reaches[1]=="all"){
     escapetotals<-streamvast$escapedata$escapetotals
@@ -818,17 +822,17 @@ plotEscapement<-function(streamvast,obs.escape,title,ribbons=NA,median=F,years="
   outplot<-ggplot2::ggplot()+
     ggplot2::geom_point(data=escape.plot,ggplot2::aes(x=Runyear,y=Escape,col=type))+
     ggplot2::geom_line(data=escape.plot,ggplot2::aes(x=Runyear,y=Escape,col=type))+
-    ggplot2::geom_line(data=escape.plot,ggplot2::aes(x=Runyear,y=Escape_lower,group=type),col=2,linetype=3)+
-    ggplot2::geom_line(data=escape.plot,ggplot2::aes(x=Runyear,y=Escape_upper,group=type),col=2,linetype=3)
+    ggplot2::geom_line(data=escape.plot,ggplot2::aes(x=Runyear,y=Escape_lower,group=type),col=col,linetype=3)+
+    ggplot2::geom_line(data=escape.plot,ggplot2::aes(x=Runyear,y=Escape_upper,group=type),col=col,linetype=3)
   if(is.na(ribbons[1])==F){
     outplot<-outplot+
-      ggplot2::geom_ribbon(data=ribbon.data,ggplot2::aes(x=Runyear,ymin=ymin,ymax=ymax,alpha=ribbon),fill=2,show.legend = F)+
-      ggplot2::geom_ribbon(data=ribbon.data,ggplot2::aes(x=Runyear,ymin=ymin2,ymax=ymax2,alpha=ribbon),fill=2,show.legend = F)+
-      scale_alpha_discrete(range=c(.1,.75))
+      ggplot2::geom_ribbon(data=ribbon.data,ggplot2::aes(x=Runyear,ymin=ymin,ymax=ymax,alpha=ribbon),fill=col,show.legend = F)+
+      ggplot2::geom_ribbon(data=ribbon.data,ggplot2::aes(x=Runyear,ymin=ymin2,ymax=ymax2,alpha=ribbon),fill=col,show.legend = F)+
+      ggplot2::scale_alpha_discrete(range=c(.1,.75))
   }
   outplot<-outplot+
     ggplot2::scale_x_continuous(n.breaks=length(unique(escapetotals$Runyear)))+
-    ggplot2::scale_color_manual(values=1:2,drop=F)+
+    ggplot2::scale_color_manual(values=c(1,col),drop=F)+
     ggplot2::theme_bw()+
     ggplot2::theme(legend.title = ggplot2::element_blank(),legend.position = "inside",
                    legend.position.inside = c(.02,.98),legend.justification = c(0,1))+

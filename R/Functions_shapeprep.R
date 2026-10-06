@@ -126,7 +126,7 @@ Makesfnetwork<-function(shape,attach.data=F,simple=T){
     for(i in 1:length(int.mat)){
 
       int.shapes<-shape.edges[int.mat[[i]],]
-      intersect.shapes<-sf::st_as_sf(sf::st_as_sfc(unique(sf::st_geometry(sf::st_intersection(int.shapes)))),crs=sf::st_crs(shape))
+      intersect.shapes<-sf::st_as_sf(unique(sf::st_geometry(sf::st_intersection(int.shapes))),crs=sf::st_crs(shape))
 
       int.points0<-intersect.shapes[sf::st_geometry_type(intersect.shapes)=="POINT",]
       int.lines0<-intersect.shapes[sf::st_geometry_type(intersect.shapes)=="LINESTRING",]
@@ -144,7 +144,7 @@ Makesfnetwork<-function(shape,attach.data=F,simple=T){
         int.points<-c(int.points,int.line.pts)
       }
 
-      int.points2<-sf::st_as_sf(sf::st_as_sfc(unique(int.points),crs=sf::st_crs(shape)))
+      int.points2<-sf::st_as_sf(unique(int.points))
       p.mat<-sf::st_equals(int.points2,shape.nodes)
       points.to.blend<-unlist(lapply(p.mat,FUN=function(x){return(length(x)==0)}))
       if(any(points.to.blend)){
