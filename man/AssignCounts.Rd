@@ -23,6 +23,8 @@ AssignCounts(
 
 \item{surveys}{A sf object with LINESTRINGs representing surveys}
 
+\item{effort}{dataframe of effort from the AssignEffort function}
+
 \item{survey.counts}{optional name of a column with survey counts}
 
 \item{geodata}{An optional dataframe with coordinates for each observation}

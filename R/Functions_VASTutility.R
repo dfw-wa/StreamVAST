@@ -9,7 +9,6 @@
 #' @param surveydata A optional data frame or sf object with survey information, such as from MakeSurveyTracks, doesn't do much right now
 #' @param countname A column name from countdata to use
 #' @param reachname a column name from reachdata to use
-#' @param unitconv a value to divide river lengths
 #'
 #' @return A streamvast object with appropriate formatting
 #' @export
@@ -143,7 +142,7 @@ ConstructStreamVAST<-function(countdata,reachdata,surveydata,
 #' @param Time character giving the timescale to use
 #' @param season a integer vector of length with order start Month, start day, end month, end day for a 'year' or 'season'
 #' @param padyear adds zeroes to the start and end of each runyear
-#' @param padhabiat adds zeros at regular intervals to areas designated non-habitat
+#' @param padhabitat adds zeros at regular intervals to areas designated non-habitat
 #'
 #' @return A streamvast object with formated with the appropriate temporal frame
 #' @export
@@ -343,7 +342,7 @@ SetTemporalFrame<-function(streamvast,startdate=NA,enddate=NA,Time="Year",
                           Original=F)
 
     # screen to remove duplicates
-    front.check.mat<-aggregate(list(Statday=out.data$Statday),
+    front.check.mat<-stats::aggregate(list(Statday=out.data$Statday),
                                by=list(Runyear=out.data$Runyear,Reach=out.data$Reach),FUN=min)
     front.dups<-subset(front.check.mat,Statday<7)
     if(nrow(front.dups)>0){
@@ -354,7 +353,7 @@ SetTemporalFrame<-function(streamvast,startdate=NA,enddate=NA,Time="Year",
       front.data<-front.data[-drops,]
     }
 
-    back.check.mat<-aggregate(list(Statday=out.data$Statday),
+    back.check.mat<-stats::aggregate(list(Statday=out.data$Statday),
                               by=list(Runyear=out.data$Runyear,Reach=out.data$Reach),FUN=max)
     maxday<-as.numeric(time.table$End-time.table$Start)
     maxday.dat<-data.frame(Runyear=time.table$Runyear,Maxday=maxday)
@@ -432,12 +431,13 @@ SetTemporalFrame<-function(streamvast,startdate=NA,enddate=NA,Time="Year",
 #' @param makeauc logical; should auc measures be calculated. Can turn off to save time.
 #' @param nsims interger; a number of simulated draws to make from the joint posterior
 #' @param bias.correct logical; should the poisson transformation bias be corrected; very slow
+#' @param seed integer; a seed for random number generation
 #'
 #' @return A streamvast object with a dataframe of predictions added
 #' @export
 #'
 #' @examples
-VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
+VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,seed=123456,bias.correct=F){
 
   if(length(streamvast$preds)>0){warning("Prediction data already found. Overwriting pre-existing data.")}
   if(length(streamvast$eval)>0){warning("Evaluation data already found. Overwriting pre-existing data.")}
@@ -450,10 +450,10 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
 
   # make predictions; for point predictions, we will use the estimated standard error
   # the preddata object is used for overall predictions, i.e. assuming full survey coverage
-  preds<-predict(streamvast$vastmodel,newdata = newdata,what = "mu_g")
-  preds.se<-predict(streamvast$vastmodel,newdata = newdata,what = "p_g",se.fit = T)
-  predsims<-Jeremy_sample_variable(obj = streamvast$vastmodel,newdata = newdata,
-                                   n_samples = nsims,bias.correct=bias.correct)
+  preds<-stats::predict(streamvast$vastmodel,newdata = newdata,what = "mu_g")
+  preds.se<-stats::predict(streamvast$vastmodel,newdata = newdata,what = "p_g",se.fit = T)
+  predsims<-tinyVAST::sample_variable(object = streamvast$vastmodel,newdata = newdata,
+                                      n_samples = nsims,variable_name = "mu_g",seed=seed)
 
   # Especially with the bias correct,sometimes there are a few divide by 0 errors
   good.col<-which(apply(predsims,MARGIN=2,FUN=function(x){return(all(is.na(x)==F))}))
@@ -467,22 +467,22 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
 
   preddata<-cbind(newdata,data.frame(pred_Count=preds,
                                      pred_Count_SE=exp(preds.se$se.fit),
-                                     pred_Count_SE2=sqrt(apply(predsims,MARGIN=1,FUN=var)),
+                                     pred_Count_SE2=sqrt(apply(predsims,MARGIN=1,FUN=stats::var)),
                                      pred_Count_lower=apply(predsims,MARGIN=1,FUN=stats::quantile,probs=.025),
                                      pred_Count_upper=apply(predsims,MARGIN=1,FUN=stats::quantile,probs=.975),
                                      pred_Density=preds/newdata$Effort,
                                      pred_Density_SE=exp(preds.se$se.fit)/newdata$Effort,
-                                     pred_Density_SE2=sqrt(apply(predsims2,MARGIN=1,FUN=var)),
+                                     pred_Density_SE2=sqrt(apply(predsims2,MARGIN=1,FUN=stats::var)),
                                      pred_Density_lower=apply(predsims2,MARGIN=1,FUN=stats::quantile,probs=.025),
                                      pred_Density_upper=apply(predsims2,MARGIN=1,FUN=stats::quantile,probs=.975)))
 
   #the evaldata object is used for comparisons with observed values, i.e. partial survey coverage
 
-  evals<-fitted.values(streamvast$vastmodel)
-  evals.se<-predict(streamvast$vastmodel,what="p_g",se.fit=T)
+  evals<-stats::fitted.values(streamvast$vastmodel)
+  evals.se<-stats::predict(streamvast$vastmodel,what="p_g",se.fit=T)
   evaldata<-cbind(streamvast$vastdata,data.frame(fit_Count=evals,
                                                  fit_Count_SE=exp(evals.se$se.fit),
-                                                 fit_Count_SE2=sqrt(apply(evalsims,MARGIN=1,FUN=var)),
+                                                 fit_Count_SE2=sqrt(apply(evalsims,MARGIN=1,FUN=stats::var)),
                                                  fit_Count_lower=apply(evalsims,MARGIN=1,FUN=stats::quantile,probs=.025),
                                                  fit_Count_upper=apply(evalsims,MARGIN=1,FUN=stats::quantile,probs=.975),
                                                  fit_Density=evals/streamvast$vastdata$Effort,
@@ -492,7 +492,7 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
                                                  fit_Density_upper=apply(evalsims2,MARGIN=1,FUN=stats::quantile,probs=.975)))
 
   # now is as good a place as any to grab some summary stats
-  streamvast$stats$AIC<-AIC(streamvast$vastmodel)
+  streamvast$stats$AIC<-stats::AIC(streamvast$vastmodel)
   streamvast$stats$rhoP<-stats::cor(evaldata$fit_Count,evaldata[,streamvast$countname],method = "pearson")
   streamvast$stats$rhoS<-stats::cor(evaldata$fit_Count,evaldata[,streamvast$countname],method = "spearman")
   streamvast$stats$RMSE<-sqrt(sum((evaldata[,streamvast$countname]-evaldata$fit_Count)^2)/nrow(evaldata))
@@ -502,7 +502,7 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
   y_ir = replicate(n = 100, expr = streamvast$vastmodel$obj$simulate()$y_i )
   dharmares = DHARMa::createDHARMa( simulatedResponse = y_ir,
                                     observedResponse = streamvast$vastdata[,streamvast$countname],
-                                    fittedPredictedResponse = fitted(streamvast$vastmodel) )
+                                    fittedPredictedResponse = stats::fitted(streamvast$vastmodel) )
 
   # Add residuals to the eval data frame
   evaldata$Residual_count<-evaldata[,streamvast$countname]-evaldata$fit_Count
@@ -529,14 +529,14 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
     if(length(evalspots)>0){
       spacedata$Density[i]<-mean(evaldata[evalspots,"Density"])
       sim.eval.means<-apply(matrix(evalsims2[evalspots,],ncol=ncol(evalsims2)),MARGIN = 2,FUN = mean)
-      spacedata$fit_Density[i]<-median(sim.eval.means)
+      spacedata$fit_Density[i]<-stats::median(sim.eval.means)
       spacedata$fit_Density_lower[i]<-stats::quantile(sim.eval.means,probs=.025,na.rm=T)
       spacedata$fit_Density_upper[i]<-stats::quantile(sim.eval.means,probs=.975,na.rm=T)
     }
 
     if(length(predspots)>0){
       sim.pred.means<-apply(matrix(predsims2[predspots,],ncol=ncol(predsims2)),MARGIN = 2,FUN = mean)
-      spacedata$pred_Density[i]<-median(sim.pred.means)
+      spacedata$pred_Density[i]<-stats::median(sim.pred.means)
       spacedata$pred_Density_lower[i]<-stats::quantile(sim.pred.means,probs=.025,na.rm=T)
       spacedata$pred_Density_upper[i]<-stats::quantile(sim.pred.means,probs=.975,na.rm=T)
     }
@@ -561,14 +561,14 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
     if(length(evalspots)>0){
       timedata$Density[i]<-mean(evaldata[evalspots,"Density"])
       sim.eval.means<-apply(matrix(evalsims2[evalspots,],ncol=ncol(evalsims2)),MARGIN = 2,FUN = mean)
-      timedata$fit_Density[i]<-median(sim.eval.means)
+      timedata$fit_Density[i]<-stats::median(sim.eval.means)
       timedata$fit_Density_lower[i]<-stats::quantile(sim.eval.means,probs=.025,na.rm=T)
       timedata$fit_Density_upper[i]<-stats::quantile(sim.eval.means,probs=.975,na.rm=T)
     }
 
     if(length(predspots)>0){
       sim.pred.means<-apply(matrix(predsims2[predspots,],ncol=ncol(predsims2)),MARGIN = 2,FUN = mean)
-      timedata$pred_Density[i]<-median(sim.pred.means)
+      timedata$pred_Density[i]<-stats::median(sim.pred.means)
       timedata$pred_Density_lower[i]<-stats::quantile(sim.pred.means,probs=.025,na.rm=T)
       timedata$pred_Density_upper[i]<-stats::quantile(sim.pred.means,probs=.975,na.rm=T)
     }
@@ -611,7 +611,7 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
                                    FUN=function(x){return(MESS::auc(x=yearreachpreds$Statday,y=x))})
           yeartotalpredsim[r,]<-yearreachpredaucs
 
-          aucdata$pred_AUC[index]<-median(yearreachpredaucs)
+          aucdata$pred_AUC[index]<-stats::median(yearreachpredaucs)
           aucdata$pred_AUC_lower[index]<-stats::quantile(yearreachpredaucs,probs = .025)
           aucdata$pred_AUC_upper[index]<-stats::quantile(yearreachpredaucs,probs = .975)
           aucdata$pred_AUC_SD[index]<-sqrt(stats::var(yearreachpredaucs))
@@ -621,7 +621,7 @@ VASTpreds<-function(streamvast,newdata,makeauc=T,nsims=100,bias.correct=F){
       }
       auctotalsims[y,2:(ncol(yeartotalpredsim)+1)]<-apply(yeartotalpredsim,MARGIN = 2,FUN = sum)
 
-      auctotals$pred_AUC[y]<-median(unlist(auctotalsims[y,2:ncol(auctotalsims)]),na.rm=T)
+      auctotals$pred_AUC[y]<-stats::median(unlist(auctotalsims[y,2:ncol(auctotalsims)]),na.rm=T)
       auctotals$pred_AUC_lower[y]<-stats::quantile(auctotalsims[y,2:ncol(auctotalsims)],probs=.025,na.rm=T)
       auctotals$pred_AUC_upper[y]<-stats::quantile(auctotalsims[y,2:ncol(auctotalsims)],probs=.975,na.rm=T)
       auctotals$pred_AUC_SD[y]<-sqrt(stats::var(unlist(auctotalsims[y,2:ncol(auctotalsims)])))
@@ -841,7 +841,7 @@ plotPredictionMap<-function(streamvast,mapvar="pred_Density",facet=NA,FUN="mean"
   if(make.labels){
     midpoints<-as.data.frame(rdat)[,c("CenterLon","CenterLat")]
     midpoints$Reach<-as.data.frame(rdat)[,rname]
-    midpoints<-st_as_sf(midpoints,coords=1:2,crs="wgs84")
+    midpoints<-sf::st_as_sf(midpoints,coords=1:2,crs="wgs84")
 
     labeldat<-data.frame(X=rep(NA,nrow(rdat)),Y=NA,labels=as.data.frame(rdat)[,rname])
     meanlength<-mean(sf::st_length(rdat))
@@ -963,101 +963,6 @@ Dharmaplot<-function(streamvast,span=.1){
     ggplot2::theme_bw()+ggplot2::xlab("Rank-transformed Predictions")+ggplot2::ylab("Scaled Residuals")
 
   return(outplot)
-}
-
-
-# For internal use by the preds functions. This is my hacked together variant that I use to sample
-# the joint posterior distribution and simulataneously generate predictions at user specified points
-# as opposed to the points in the original data
-#' Title
-#'
-#' @param obj a tinyVAST model object
-#' @param newdata a dataset for making new predictions
-#' @param what what predictions are desired, almost always "mu_g"
-#' @param n_samples integer of samples
-#' @param sample_fixed logical; almost always T
-#' @param seed integer; a seed for the random draws
-#' @param bias.correct logical; should the transformation bias correction be applied; very slow
-#'
-#' @return an object with simulated predictions on newdata
-#' @export
-#'
-#' @examples
-Jeremy_sample_variable<-function(obj,newdata,what="mu_g",n_samples=100,sample_fixed=TRUE,seed=123456,bias.correct=F){
-
-  if (!("jointPrecision" %in% names(obj$sdrep))) {
-    stop("jointPrecision not present in x$sdrep; please re-run with `getJointPrecision=TRUE`")
-  }
-  ParHat = obj$obj$env$parList()
-  Intersect = intersect(names(obj$rep), names(ParHat))
-  if (isFALSE(all.equal(obj$rep[Intersect], ParHat[Intersect]))) {
-    stop("Duplicate entries in `Obj$report()` and `Obj$env$parList()` are not identical when calling `sample_variable`")
-  }
-  Output = c(obj$rep, ParHat)
-  # if (isFALSE(variable_name %in% names(Output))) {
-  #   stop(variable_name, " not found in `Obj$report()` or `Obj$env$parList()`; please choose check your requested variable name from available list: ",
-  #        paste(names(Output), collapse = ", "))
-  # }
-  rmvnorm_prec <- function(mu, prec, n.sims, seed) {
-    set.seed(seed)
-    z <- matrix(rnorm(length(mu) * n.sims), ncol = n.sims)
-    L <- Matrix::Cholesky(prec, super = TRUE)
-    z <- Matrix::solve(L, z, system = "Lt")
-    z <- Matrix::solve(L, z, system = "Pt")
-    z <- as.matrix(z)
-    return(mu + z)
-  }
-  if (sample_fixed == TRUE) {
-    u_zr = rmvnorm_prec(mu = obj$obj$env$last.par.best, prec = obj$sdrep$jointPrecision,
-                        n.sims = n_samples, seed = seed)
-  } else {
-    u_zr = obj$obj$env$last.par.best %o% rep(1, n_samples)
-    MC = obj$obj$env$MC(keep = TRUE, n = n_samples, antithetic = FALSE)
-    u_zr[obj$obj$env$random, ] = attr(MC, "samples")
-  }
-  message("# Obtaining samples from predictive distribution for variable ",
-          what)
-  for (rI in 1:n_samples) {
-    if (rI%%max(1, floor(n_samples/10)) == 0) {
-      message("  Running sample ", rI, " of ", n_samples)
-    }
-    Report = obj$obj$report(par = u_zr[, rI])
-    ParHat = obj$obj$env$parList(x = u_zr[, rI][obj$obj$env$lfixed()],
-                                 par = u_zr[, rI])
-    if (isFALSE(all.equal(obj$rep[Intersect], ParHat[Intersect]))) {
-      stop("Duplicate entries in `obj$obj$report()` and `obj$obj$env$parList()` are not identical when calling `sample_variable`")
-    }
-
-    # perhaps add an if statement dependent on newdata
-    # this part taken from tinyVAST.predict
-    tmb_data2 = add_predictions( object = obj,
-                                 newdata = newdata,
-                                 remove_origdata = FALSE )
-
-    # Rebuild object
-    newobj = TMB::MakeADFun( data = tmb_data2,    # insert newdata
-                             parameters = ParHat, # insert new parameters
-                             map = obj$tmb_inputs$tmb_map,
-                             random = obj$tmb_inputs$tmb_random,
-                             profile = obj$internal$control$profile,
-                             hessian = T,
-                             DLL = "tinyVAST" )
-    newobj$env$beSilent()
-    if(bias.correct){
-      newobj.sd<-TMB::sdreport(obj = newobj,
-                               getReportCovariance = F,
-                               bias.correct = F)
-      out0 <- exp(newobj.sd$value-((newobj.sd$sd)^2)/2)
-    }else{
-      out0<-newobj$report()[[what]]
-    }
-    if(rI==1){
-      out<-as.matrix(out0)
-    }else{
-      out<-cbind(out,out0) # cbind is too slow, ought to change
-    }
-  }
-  return(out)
 }
 
 

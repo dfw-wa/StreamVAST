@@ -4,7 +4,14 @@
 \alias{VASTpreds}
 \title{Get density predictions from a VAST model}
 \usage{
-VASTpreds(streamvast, newdata, makeauc = T, nsims = 100, bias.correct = F)
+VASTpreds(
+  streamvast,
+  newdata,
+  makeauc = T,
+  nsims = 100,
+  seed = 123456,
+  bias.correct = F
+)
 }
 \arguments{
 \item{streamvast}{A VAST model object}
@@ -14,6 +21,8 @@ VASTpreds(streamvast, newdata, makeauc = T, nsims = 100, bias.correct = F)
 \item{makeauc}{logical; should auc measures be calculated. Can turn off to save time.}
 
 \item{nsims}{interger; a number of simulated draws to make from the joint posterior}
+
+\item{seed}{integer; a seed for random number generation}
 
 \item{bias.correct}{logical; should the poisson transformation bias be corrected; very slow}
 }

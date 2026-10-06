@@ -8,11 +8,9 @@ Description: Data formatting for stream networks for use with 'VAST'.
     The package provides tools for manipulating stream lines into a network, 
     associating data with those lines, formatting the data for 'VAST', and plotting
     the output.
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Imports:
     stats,
     utils,
@@ -25,9 +23,11 @@ Imports:
     sfnetworks,
     lwgeom,
     ggplot2,
-    viridis
+    viridis,
+    INLA
 Suggests: 
     knitr,
     rmarkdown
 VignetteBuilder: knitr
 URL: https://jpharris7.github.io/StreamVAST/
+Config/roxygen2/version: 8.1.0

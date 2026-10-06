@@ -5,10 +5,12 @@
 \title{Summarize the results of a survival model in tabular form. Will also draw sims from the
 INLA survival model}
 \usage{
-SurvivalTable(model, nsims = 0, extrayears, extramethod, streamvast, mult = 1)
+SurvivalTable(model, streamvast, nsims = 0, extrayears, extramethod, mult = 1)
 }
 \arguments{
 \item{model}{A fitted INLA survival model}
+
+\item{streamvast}{a streamvast object with a fitted model and density predictions}
 
 \item{nsims}{A number of sims to draw from the joint posterior}
 

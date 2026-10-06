@@ -9,15 +9,20 @@ plotEscapement(
   obs.escape,
   title,
   ribbons = NA,
-  median = F,
+  median = T,
   years = "all",
-  reaches = "all"
+  reaches = "all",
+  color = 2
 )
 }
 \arguments{
+\item{streamvast}{A streamvast object with escapement predictions}
+
 \item{obs.escape}{A vector of observed or reported escapement values; must be equal to the # of years in escape}
 
 \item{title}{character; a title to be passed to ggtitle}
+
+\item{ribbons}{a positive integer, the number of shaded ribbons for the CI}
 
 \item{median}{should the plot show the predicted escapement based on the mle or the median of the posterior}
 
@@ -25,7 +30,7 @@ plotEscapement(
 
 \item{reaches}{a vector of reach numbers to be included}
 
-\item{escape}{A table of escapement values, usually from MakeEscapement}
+\item{color}{integer or character; a color for the plot}
 }
 \value{
 either a ggplot object or a dataframe depending on the 'plot' option

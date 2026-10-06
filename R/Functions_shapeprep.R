@@ -338,7 +338,7 @@ LocateFeature<-function(shape,type="s",guide){
   midpoint<-c(X=mean(c(bounds$xmin,bounds$xmax)),Y=mean(c(bounds$ymin,bounds$ymax)))
 
   # set up a network
-  if(class(shape)[1]=="sfnetwork"){
+  if(inherits(shape,"sfnetwork")){
     shape.edges<-sf::st_as_sf(sfnetworks::activate(shape,"edges"))
     shape.nodes<-sf::st_as_sf(sfnetworks::activate(shape,"nodes"))
     shape.net<-shape
@@ -393,7 +393,7 @@ LocateFeature<-function(shape,type="s",guide){
       print("Please click on the image to select a feature")
       user.pick<-unlist(graphics::locator(n=1))
       user.sf<-sf::st_as_sf(data.frame(x=user.pick[1],y=user.pick[2]),coords=1:2,crs=sf::st_crs(shape))
-      plot(st_geometry(user.sf),add=T,col=2,pch=8)
+      plot(sf::st_geometry(user.sf),add=T,col=2,pch=8)
 
       # because of CompSci shenanigans, this point is often not quite on the line, so fix that
       if(type=="POINT"){
@@ -446,7 +446,7 @@ LocateFeature<-function(shape,type="s",guide){
 #' @examples
 EditFeatures<-function(shape,root,guide){
 
-  if(class(shape)[1]!="sfnetwork"){
+  if(inherits(shape,"sfnetwork")==F){
     shape.net<-Makesfnetwork(shape)
   }else{
     shape.net<-shape
@@ -518,7 +518,7 @@ EditFeatures<-function(shape,root,guide){
       print("Please click on the image to add a point")
       user.pick<-unlist(graphics::locator(n=1))
       user.sf<-sf::st_as_sf(data.frame(x=user.pick[1],y=user.pick[2]),coords=1:2,crs=sf::st_crs(shape))
-      plot(st_geometry(user.sf),add=T,col=2,pch=8)
+      plot(sf::st_geometry(user.sf),add=T,col=2,pch=8)
 
       shape.line<-temp.edges[sf::st_nearest_feature(user.sf,temp.edges),]
       pick0<-sf::st_as_sf(sf::st_cast(sf::st_nearest_points(user.sf,shape.line),"POINT"))[2,]
@@ -541,7 +541,7 @@ EditFeatures<-function(shape,root,guide){
       print("Please click on the image to select a feature")
       user.pick<-unlist(graphics::locator(n=1))
       user.sf<-sf::st_as_sf(data.frame(x=user.pick[1],y=user.pick[2]),coords=1:2,crs=sf::st_crs(shape))
-      plot(st_geometry(user.sf),add=T,col=2,pch=8)
+      plot(sf::st_geometry(user.sf),add=T,col=2,pch=8)
 
       # When removing a vertex, you can't remove the root
       if(type=="VERTEX"){
@@ -666,7 +666,7 @@ EditFeatures<-function(shape,root,guide){
 AddFeatures<-function(network,nodes,edges,crs,tolerance=200,tolerance2=10){
 
   old.net<-network
-  if(class(network)[1]!="sfnetwork"){
+  if(inherits(network,"sfnetwork")==F){
     print("Converting shape to sfnetwork")
     network<-Makesfnetwork(network)
   }
@@ -1244,7 +1244,7 @@ AttachData<-function(shape,
   out.shape.sf<-cbind(shape.sf,transfer.dat)
 
   # return the shape in the same format as it was given
-  if(class(shape)[1]=="sfnetwork"){
+  if(inherits(shape,"sfnetwork")){
     return(sfnetworks::as_sfnetwork(out.shape.sf))
   }else(
     return(out.shape.sf)
@@ -1350,7 +1350,7 @@ PruneNetwork<-function(network,root,exclude,match,tolerance=100,plot=T){
     #if(any(sf::st_geometry_type(match)))){stop("Multiple geometry types in match argument")}
 
     match2<-sf::st_sfc(unique(sf::st_geometry(match)),crs=sf::st_crs(match))
-    match2<-match2[st_is_empty(match2)==F]
+    match2<-match2[sf::st_is_empty(match2)==F]
 
     network2<-Makesfnetwork(good.edges1,attach.data = F)
     network2<-RootNetwork(network2,root = root.sf)
@@ -1735,7 +1735,7 @@ MakeSurveyTracks<-function(shape, surveys,surveys.crs="wgs84",save.col="all",
         new.shape<-sf::st_as_sf(sf::st_line_merge(sf::st_combine(new.shape)))
         sf::st_geometry(new.shape)<-"geometry"
         match.dat$Valid_Geo[i]<-T
-        st_geometry(match.dat)[i]<-st_geometry(new.shape)
+        sf::st_geometry(match.dat)[i]<-sf::st_geometry(new.shape)
       }else{
         match.dat$Valid_Geo[i]<-F
       }
@@ -1949,7 +1949,7 @@ AssignEffort<-function(shape,surveys,dist.units,tolerance=10,key){
   if(length(year.col)!=1 | length(day.col)!=1){stop("Please ensure your survey data contains columns named 'Year' and 'Day'")}
 
   # determine how many unique shapes we have and book-keeping
-  unique.matrix<-st_equals(surveys$geometry)
+  unique.matrix<-sf::st_equals(surveys$geometry)
 
   reference.tracks<-NULL
   accounted<-NULL
@@ -2005,7 +2005,7 @@ AssignEffort<-function(shape,surveys,dist.units,tolerance=10,key){
 
   # clean things up and make a nice output
   out.data<-as.data.frame(surveys)[,c(key.col,year.col,day.col)]
-  out.data$SurveyLength<-as.numeric(units::set_units(st_length(surveys),dist.units,mode="standard"))
+  out.data$SurveyLength<-as.numeric(units::set_units(sf::st_length(surveys),dist.units,mode="standard"))
   out.data$AssignedLength<-apply(eff.matrix.full,1,sum)
 
   return(cbind(out.data,eff.matrix.full))
@@ -2022,6 +2022,7 @@ AssignEffort<-function(shape,surveys,dist.units,tolerance=10,key){
 #' Need to investigate further and then fix. In meantime, always be sure to check outputs.
 #'
 #' @param shape A sf object with LINESTRING geometries, or a sfnetwork
+#' @param effort dataframe of effort from the AssignEffort function
 #' @param geodata An optional dataframe with coordinates for each observation
 #' @param geodata.coords A character vector with the column names for lon/lat in georedds
 #' @param geodata.counts character; name of the column with count for each observation; if missing assumes 1 count per line
@@ -2146,7 +2147,7 @@ AssignCounts<-function(shape,surveys,effort,survey.counts,geodata=NA,geodata.cou
     }
     geodata.sf3<-subset(geodata.sf3,as.data.frame(geodata.sf3)[,key]%in%out.data[,key])
 
-    geodata.sums<-aggregate(list(count=as.data.frame(geodata.sf3)[,geodata.counts]),
+    geodata.sums<-stats::aggregate(list(count=as.data.frame(geodata.sf3)[,geodata.counts]),
                             by=list(key=as.data.frame(geodata.sf3)[,key]),FUN=sum)
     out.data$GeoCount<-0
     match.vec<-match(geodata.sums$key,out.data[,key])
@@ -2215,7 +2216,7 @@ AssignCounts<-function(shape,surveys,effort,survey.counts,geodata=NA,geodata.cou
     if(inherits(geodata.sf3,"data.frame")){
       active.geocount<-as.data.frame(geodata.sf3[as.data.frame(geodata.sf3)[,key]==active.key,])
       if(nrow(active.geocount)>0){
-        active.geosums<-aggregate(list(count=active.geocount[,geodata.counts]),
+        active.geosums<-stats::aggregate(list(count=active.geocount[,geodata.counts]),
                                   by=list(Reach=active.geocount$closest),FUN=sum)
       }
     }
@@ -2224,14 +2225,14 @@ AssignCounts<-function(shape,surveys,effort,survey.counts,geodata=NA,geodata.cou
     if(nrow(survey.counts.sf)>0){
       active.surveycount<-as.data.frame(survey.counts.sf[as.data.frame(survey.counts.sf)[,key]==active.key,])
       if(nrow(active.surveycount)>0){
-        active.surveysums<-aggregate(list(count=active.surveycount[,geodata.counts]),
+        active.surveysums<-stats::aggregate(list(count=active.surveycount[,geodata.counts]),
                                      by=list(Reach=active.surveycount$closest),FUN=sum)
       }
     }
 
     active.sums<-rbind(active.geosums,active.surveysums)
     if(nrow(active.sums)>0){
-      active.sums<-aggregate(list(count=active.sums$count),
+      active.sums<-stats::aggregate(list(count=active.sums$count),
                              by=list(Reach=active.sums$Reach),FUN=sum)
 
       count.dat[i,active.sums$Reach]<-active.sums$count
@@ -2244,7 +2245,7 @@ AssignCounts<-function(shape,surveys,effort,survey.counts,geodata=NA,geodata.cou
   # If you want to skip a step, the Format Counts function can be run
   # using the same arguments
   if(format.output==T){
-    return(FormatCounts(countdata = cbind(out.data,count.data),effort = effort,shape = shape,
+    return(FormatCounts(countdata = cbind(out.data,count.dat),effort = effort,shape = shape,
                         merge = T,key = key))
   }
 

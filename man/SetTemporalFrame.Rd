@@ -27,7 +27,7 @@ SetTemporalFrame(
 
 \item{padyear}{adds zeroes to the start and end of each runyear}
 
-\item{padhabiat}{adds zeros at regular intervals to areas designated non-habitat}
+\item{padhabitat}{adds zeros at regular intervals to areas designated non-habitat}
 }
 \value{
 A streamvast object with formated with the appropriate temporal frame

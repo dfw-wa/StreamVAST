@@ -18,8 +18,6 @@ ConstructStreamVAST(countdata, reachdata, surveydata, countname, reachname)
 \item{countname}{A column name from countdata to use}
 
 \item{reachname}{a column name from reachdata to use}
-
-\item{unitconv}{a value to divide river lengths}
 }
 \value{
 A streamvast object with appropriate formatting
